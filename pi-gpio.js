@@ -26,6 +26,24 @@ var pinMapping = {
 	"26": 7
 };
 
+var rPiRev = "cat /proc/cmdline | awk -v RS=' ' -F= '/boardrev/ { print $2 }'"
+exec(rPiRev, function (error, stdout, stderr) {
+	if (stdout == "0x02" || stdout == "0x03") { return; }
+	var modPinMapping = {
+		"3": 2,
+		"5": 3,
+		"13": 27,
+		"30": 28,
+		"31": 29,
+		"32": 30,
+		"33": 31
+	};
+
+	for(var pin in modPinMapping) {
+		pinMapping[pin] = modPinMapping[pin];
+	}
+});
+
 function isNumber(number) {
 	return !isNaN(parseInt(number, 10));
 }
