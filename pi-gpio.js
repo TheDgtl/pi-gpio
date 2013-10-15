@@ -81,21 +81,49 @@ function sanitizeDirection(direction) {
 	}
 }
 
+function sanitizePull(pull) {
+	pull = (pull || "").toLowerCase().trim();
+	if (pull === "pullup" || pull === "pulldown") {
+		return pull;
+	} else {
+		return "";
+	}
+}
+
+function sanitizeOptions(options) {
+	if (options && typeof options === "string") {
+		var optionTokens = options.split(' ');
+		options = {};
+		options.direction = optionTokens[0];
+		options.pull = optionTokens[1];
+	}
+	options.direction = sanitizeDirection(options.direction);
+	options.pull = sanitizePull(options.pull);
+	return options;
+}
+
 var gpio = {
-	open: function(pinNumber, direction, callback) {
+	_usedPins: [],
+	_listeners: [],
+
+	open: function(pinNumber, options, callback) {
 		pinNumber = sanitizePinNumber(pinNumber);
 
-		if(!callback && typeof direction === "function") {
-			callback = direction;
-			direction = "out";
+		if (gpio._usedPins.indexOf(pinNumber) == -1) {
+			gpio._usedPins.push(pinNumber);
 		}
 
-		direction = sanitizeDirection(direction);
+		if(!callback && typeof options === "function") {
+			callback = options;
+			options = "out";
+		}
 
-		exec(gpioAdmin + " export " + pinMapping[pinNumber], handleExecResponse("open", pinNumber, function(err) {
+		options = sanitizeOptions(options);
+
+		exec(gpioAdmin + " export " + pinMapping[pinNumber] + " " + options.pull, handleExecResponse("open", pinNumber, function(err) {
 			if(err) return (callback || noop)(err);
 
-			gpio.setDirection(pinNumber, direction, callback);
+			gpio.setDirection(pinNumber, options.direction, callback);
 		}));
 	},
 
@@ -118,6 +146,11 @@ var gpio = {
 	close: function(pinNumber, callback) {
 		pinNumber = sanitizePinNumber(pinNumber);
 
+		var i = gpio._usedPins.indexOf(pinNumber);
+		if (i != -1) {
+			gpio._usedPins.splice(i, 1);	
+		}
+
 		exec(gpioAdmin + " unexport " + pinMapping[pinNumber], handleExecResponse("close", pinNumber, callback || noop));
 	},
 
@@ -137,8 +170,22 @@ var gpio = {
 		value = !!value?"1":"0";
 
 		fs.writeFile(sysFsPath + "/gpio" + pinMapping[pinNumber] + "/value", value, "utf8", callback);
-	}
+	},
+
+	cleanup: function(callback) {
+        var listeners = gpio._listeners.slice(0);
+        for (var i = 0; i < listeners.length; i++) {
+            clearInterval(listeners[i]);
+        }        
+
+        var usedPins = gpio._usedPins.slice(0);
+        for (var i = 0; i < usedPins.length; i++) {
+            gpio.close(usedPins[i], callback);
+        }
+	},
 };
+
+process.on('SIGINT', gpio.cleanup);
 
 gpio.export = gpio.open;
 gpio.unexport = gpio.close;
