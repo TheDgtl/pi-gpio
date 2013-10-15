@@ -172,20 +172,53 @@ var gpio = {
 		fs.writeFile(sysFsPath + "/gpio" + pinMapping[pinNumber] + "/value", value, "utf8", callback);
 	},
 
-	cleanup: function(callback) {
-        var listeners = gpio._listeners.slice(0);
-        for (var i = 0; i < listeners.length; i++) {
-            clearInterval(listeners[i]);
-        }        
+	listen: function(pinNumber, options, callback) {
+		pinNumber = sanitizePinNumber(pinNumber);
 
-        var usedPins = gpio._usedPins.slice(0);
-        for (var i = 0; i < usedPins.length; i++) {
-            gpio.close(usedPins[i], callback);
-        }
+		if(!callback && typeof options === "function") {
+			callback = options;
+			options = "out";
+		}
+
+		options = sanitizeOptions(options);
+
+		var readLoop = function() {
+			gpio.read(pinNumber, function(err, value) {
+				var knownValue = value;
+				var timer = setInterval(function() {
+					gpio.read(pinNumber, function(err, value) {
+						if (knownValue != value) {
+							knownValue = value;
+							(callback || noop)(null, value);
+						}
+					});
+				}, 250);
+
+				gpio._listeners.push(timer);
+			});
+		};
+
+		if (gpio._usedPins.indexOf(pinNumber) == -1) {
+			gpio.open(pinNumber, options, function(err) {
+				readLoop();	
+			});
+		} else {
+			readLoop();	
+		}
+	},
+
+	cleanup: function(callback) {
+	    var listeners = gpio._listeners.slice(0);
+	    for (var i = 0; i < listeners.length; i++) {
+	        clearInterval(listeners[i]);
+	    }        
+
+	    var usedPins = gpio._usedPins.slice(0);
+	    for (var i = 0; i < usedPins.length; i++) {
+	        gpio.close(usedPins[i], callback);
+	    }
 	},
 };
-
-process.on('SIGINT', gpio.cleanup);
 
 gpio.export = gpio.open;
 gpio.unexport = gpio.close;
