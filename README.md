@@ -293,6 +293,26 @@ Writes ``value`` to ``pinNumber``. Will obviously fail if the pin is not in the 
 * ``value``: Should be either a numeric ``0`` or ``1``. Any value that isn't ``0`` or ``1`` will be coerced to be boolean, and then converted to 0 (false) or 1 (true). Just stick to sending a numeric 0 or 1, will you? ;)
 * ``callback``: Will be called when the value is set. Again, might receive an error.
 
+### .listen(pinNumber, [callback])
+
+Continually monitor a pin for changes. Most useful if the pin is in the ``input`` direction. 
+
+* ``pinNumber``: As usual.
+* ``callback``: Will receive a possible error object as the first argument, and the value of the pin as the second argument. The value will be either ``0`` or ``1`` (numeric).
+
+Example:
+```javascript
+gpio.read(16, function(err, value) {
+	if(err) throw err;
+	console.log(value);	// The current state of the pin
+});
+```
+
+
+## .cleanup([callback])
+Stop all listening and close any pins in use (if not already closed)
+* ``callback``: Will be called when the value is set. Again, might receive an error.
+
 ## Misc
 
 * To run tests: ``npm install && npm test`` where you've got the checkout.
